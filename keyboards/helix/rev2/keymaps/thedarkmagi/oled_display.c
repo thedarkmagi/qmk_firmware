@@ -13,6 +13,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#define OLED_TIMEOUT 1000
+#define OLED_FADE_OUT 
+#define OLED_SCROLL_TIMEOUT 600
+
 
 #include <stdio.h>
 #include <string.h>
@@ -51,19 +55,7 @@ oled_rotation_t oled_init_user(oled_rotation_t rotation) {
 #        define oled_write_P(data,flag)  matrix_write_P(matrix, data)
 #    endif
 
-#    ifdef SSD1306OLED
-void matrix_scan_user(void) {
-    oled_task();  // this is what updates the display continuously
-}
 
-void matrix_update(struct CharacterMatrix *dest,
-                   const struct CharacterMatrix *source) {
-    if (memcmp(dest->display, source->display, sizeof(dest->display))) {
-        memcpy(dest->display, source->display, sizeof(dest->display));
-        dest->dirty = true;
-    }
-}
-#    endif
 
 //assign the right code to your layers for OLED display
 #define L_BASE 0
@@ -72,11 +64,9 @@ void matrix_update(struct CharacterMatrix *dest,
 #define L_ADJUST (1<<_ADJUST)
 #define L_ADJUST_TRI (L_ADJUST|L_RAISE|L_LOWER)
 
-#    ifdef SSD1306OLED
-static void render_logo(struct CharacterMatrix *matrix) {
-#    else
+
 static void render_logo(void) {
-#    endif
+
 
     static const char helix_logo[] PROGMEM ={
         0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0x88,0x89,0x8a,0x8b,0x8c,0x8d,0x8e,0x8f,0x90,0x91,0x92,0x93,0x94,
@@ -86,11 +76,9 @@ static void render_logo(void) {
     oled_write_P(helix_logo, false);
 }
 
-#    ifdef SSD1306OLED
-static void render_rgbled_status(bool full, struct CharacterMatrix *matrix) {
-#    else
+
 static void render_rgbled_status(bool full) {
-#    endif
+
 #    ifdef RGBLIGHT_ENABLE
     char buf[30];
     if (RGBLIGHT_MODES > 1 && rgblight_is_enabled()) {
@@ -108,11 +96,9 @@ static void render_rgbled_status(bool full) {
 #    endif
 }
 
-#    ifdef SSD1306OLED
-static void render_layer_status(struct CharacterMatrix *matrix) {
-#    else
+
 static void render_layer_status(void) {
-#    endif
+
   // Define layers here, Have not worked out how to have text displayed for each layer. Copy down the number you see and add a case for it below
     char buf[10];
     oled_write_P(PSTR("Layer: "), false);
@@ -138,11 +124,9 @@ static void render_layer_status(void) {
     oled_write_P(PSTR("\n"), false);
 }
 
-#    ifdef SSD1306OLED
-void render_status(struct CharacterMatrix *matrix) {
-#    else
+
 void render_status(void) {
-#    endif
+
   // Render to mode icon
     static const char os_logo[][2][3] PROGMEM = {{{0x95,0x96,0},{0xb5,0xb6,0}},{{0x97,0x98,0},{0xb7,0xb8,0}}};
     if (is_mac_mode()) {
@@ -156,11 +140,9 @@ void render_status(void) {
     }
 
     oled_write_P(PSTR(" "), false);
-#    ifdef SSD1306OLED
-    render_layer_status(matrix);
-#    else
+
     render_layer_status();
-#    endif
+
 
     // Host Keyboard LED Status
     led_t led_state = host_keyboard_led_state();
@@ -168,12 +150,10 @@ void render_status(void) {
     oled_write_P(led_state.caps_lock ? PSTR("CAPS") : PSTR("    "), false);
     oled_write_P(led_state.scroll_lock ? PSTR("SCLK") : PSTR("    "), false);
     oled_write_P(PSTR("\n"), false);
-#    ifdef SSD1306OLED
-    render_rgbled_status(true, matrix);
-#    else
+
     render_rgbled_status(true);
     oled_write_P(PSTR("\n"), false);
-#    endif
+
 }
 
 
@@ -208,6 +188,35 @@ void iota_gfx_task_user(void) {
     matrix_update(&display, &matrix);
 }
 #    else
+	
+//Setup some mask which can be or'd with bytes to turn off pixels
+const uint8_t single_bit_masks[8] = {127, 191, 223, 239, 247, 251, 253, 254};
+
+
+static void fade_display(void) {
+    //Define the reader structure
+    oled_buffer_reader_t reader;
+    uint8_t buff_char;
+    if (random() % 30 == 0) {
+        srand(timer_read());
+        // Fetch a pointer for the buffer byte at index 0. The return structure
+        // will have the pointer and the number of bytes remaining from this
+        // index position if we want to perform a sequential read by
+        // incrementing the buffer pointer
+        reader = oled_read_raw(0);
+        //Loop over the remaining buffer and erase pixels as we go
+        for (uint16_t i = 0; i < reader.remaining_element_count; i++) {
+            //Get the actual byte in the buffer by dereferencing the pointer
+            buff_char = *reader.current_element;
+            if (buff_char != 0) {
+                oled_write_raw_byte(buff_char & single_bit_masks[rand() % 8], i);
+            }
+            //increment the pointer to fetch a new byte during the next loop
+            reader.current_element++;
+        }
+    }
+}
+
 void oled_task_user(void) {
 
 #        if DEBUG_TO_SCREEN
@@ -218,11 +227,17 @@ void oled_task_user(void) {
 
     if (is_keyboard_master()) {
         render_status();
+		fade_display();
     } else {
         render_logo();
         render_rgbled_status(false);
         render_layer_status();
+		fade_display();
     }
 }
 #    endif
 #endif
+
+
+
+

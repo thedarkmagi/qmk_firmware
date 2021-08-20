@@ -509,3 +509,4 @@ void music_scale_user(void)
 }
 
 #endif
+
