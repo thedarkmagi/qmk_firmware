@@ -13,9 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#define OLED_TIMEOUT 1000
-#define OLED_FADE_OUT 
-#define OLED_SCROLL_TIMEOUT 600
+
 
 
 #include <stdio.h>
@@ -224,7 +222,8 @@ void oled_task_user(void) {
         return;
     }
 #        endif
-
+	if (is_oled_on())
+	{
     if (is_keyboard_master()) {
         render_status();
 		fade_display();
@@ -234,6 +233,7 @@ void oled_task_user(void) {
         render_layer_status();
 		fade_display();
     }
+	}
 }
 #    endif
 #endif
