@@ -61,6 +61,7 @@ oled_rotation_t oled_init_user(oled_rotation_t rotation) {
 #define L_RAISE (1<<_RAISE)
 #define L_ADJUST (1<<_ADJUST)
 #define L_ADJUST_TRI (L_ADJUST|L_RAISE|L_LOWER)
+#define L_NUM (1<<_COLEMAK)
 
 
 static void render_logo(void) {
@@ -114,6 +115,9 @@ static void render_layer_status(void) {
     case L_ADJUST_TRI:
         oled_write_P(PSTR("Adjust"), false);
         break;
+	case L_NUM:
+		oled_write_P(PSTR("Numpad"), false);
+		break;
     default:
         oled_write_P(PSTR("Undef-"), false);
         snprintf(buf,sizeof(buf), "%ld", layer_state);
